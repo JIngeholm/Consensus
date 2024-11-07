@@ -34,7 +34,6 @@ type Request struct {
 
 func (n *Node) RequestCS(ctx context.Context, req *leader.Request) (*leader.Response, error) {
 
-	// Log the request and update the timestamp
 	fmt.Printf("Node %d requesting CS at time %s\n", req.GetNodeId(), unixNanoToDateString(req.GetTimestamp()))
 
 	if req.GetTimestamp() > n.timestamp {
@@ -43,7 +42,6 @@ func (n *Node) RequestCS(ctx context.Context, req *leader.Request) (*leader.Resp
 	n.timestamp++
 	n.hasSentRequest = true
 
-	// Send requests to other nodes
 	var replies int
 	for _, peer := range n.peers {
 		if peer != fmt.Sprintf("localhost:%d", n.nodeID) {
@@ -71,12 +69,10 @@ func (n *Node) RequestCS(ctx context.Context, req *leader.Request) (*leader.Resp
 		}
 	}
 
-	// If quorum is reached, grant access to the CS
 	if replies >= n.quorum {
 		n.criticalSec = true
 		fmt.Printf("Node %d has entered the Critical Section.\n", n.nodeID)
 
-		// Simulate accessing the Critical Section
 		n.enterCS()
 		n.timestamp = time.Now().UnixNano()
 		n.criticalSec = false
@@ -105,7 +101,6 @@ func (n *Node) RequestCS(ctx context.Context, req *leader.Request) (*leader.Resp
 
 func (n *Node) ReplyCS(ctx context.Context, req *leader.Request) (*leader.Response, error) {
 
-	// Handle reply logic based on Ricart-Agrawala
 	fmt.Printf("Comparing %d's req timestamp %s to own timestamp %s", req.NodeId, unixNanoToDateString(req.GetTimestamp()), unixNanoToDateString(n.timestamp))
 	fmt.Println()
 	if req.GetTimestamp() <= n.timestamp || !n.hasSentRequest {
@@ -149,7 +144,6 @@ func (n *Node) startServer() {
 }
 
 func main() {
-	// Example: Node 1 running on port 50051
 	port := flag.Int64("port", 50051, "Port for the gRPC server to listen on")
 	flag.Parse()
 
@@ -163,10 +157,8 @@ func main() {
 
 	go node.startServer()
 
-	// Simulate sending a request to enter the Critical Section
 	time.Sleep(10 * time.Second)
 
-	// Make the request (you can add more logic for when nodes send requests)
 	client, err := node.getClient(fmt.Sprintf("localhost:%d", node.nodeID))
 	if err != nil {
 		log.Fatal(err)
@@ -177,7 +169,6 @@ func main() {
 		Timestamp: time.Now().UnixNano(),
 	}
 
-	// Send request to other nodes
 	_, err = client.RequestCS(context.Background(), req)
 	if err != nil {
 		log.Fatal(err)
