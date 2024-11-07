@@ -178,8 +178,6 @@ func main() {
 }
 
 func unixNanoToDateString(unixNano int64) string {
-	// Convert UnixNano to a time.Time object
 	t := time.Unix(0, unixNano)
-	// Format the time as a string
 	return t.Format("2006-01-02 15:04:05.999999999")
 }
