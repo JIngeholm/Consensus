@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"net"
 	"sync"
 	"time"
@@ -32,7 +33,6 @@ type Request struct {
 }
 
 func (n *Node) RequestCS(ctx context.Context, req *leader.Request) (*leader.Response, error) {
-
 
 	// Log the request and update the timestamp
 	fmt.Printf("Node %d requesting CS at time %s\n", req.GetNodeId(), unixNanoToDateString(req.GetTimestamp()))
@@ -82,17 +82,20 @@ func (n *Node) RequestCS(ctx context.Context, req *leader.Request) (*leader.Resp
 		n.criticalSec = false
 
 	}
-	
+	bestTime := math.MaxInt
+	var bestReq leader.Request
 	for _, req := range n.requests {
-		client, err := n.getClient(fmt.Sprintf("localhost:%d", req.NodeId))
-		if err != nil {
-			return nil, err
+		if req.GetTimestamp() < int64(bestTime) {
+			bestTime = int(req.GetTimestamp())
+			bestReq = req
 		}
-		client.RequestCS(context.Background(), &req)
-		
-		bestTime 
-		
+
 	}
+	client, err := n.getClient(fmt.Sprintf("localhost:%d", bestReq.NodeId))
+	if err != nil {
+		return nil, err
+	}
+	client.RequestCS(context.Background(), &bestReq)
 	for k := range n.requests {
 		delete(n.requests, k)
 	}
