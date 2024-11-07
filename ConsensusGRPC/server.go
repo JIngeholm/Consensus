@@ -16,13 +16,14 @@ import (
 
 type Node struct {
 	leader.UnimplementedLeaderServiceServer
-	nodeID      int32
-	timestamp   int64
-	quorum      int
-	criticalSec bool
-	peers       []string
-	requests    map[int32]leader.Request
-	grantMutex  sync.Mutex
+	nodeID         int32
+	timestamp      int64
+	quorum         int
+	criticalSec    bool
+	peers          []string
+	requests       map[int32]leader.Request
+	grantMutex     sync.Mutex
+	hasSentRequest bool
 }
 
 type Request struct {
@@ -31,21 +32,23 @@ type Request struct {
 }
 
 func (n *Node) RequestCS(ctx context.Context, req *leader.Request) (*leader.Response, error) {
-	n.grantMutex.Lock()
-	defer n.grantMutex.Unlock()
+
 
 	// Log the request and update the timestamp
-	fmt.Printf("Node %d requesting CS at time %d\n", req.GetNodeId(), req.GetTimestamp())
+	fmt.Printf("Node %d requesting CS at time %s\n", req.GetNodeId(), unixNanoToDateString(req.GetTimestamp()))
 
 	if req.GetTimestamp() > n.timestamp {
 		n.timestamp = req.GetTimestamp()
 	}
 	n.timestamp++
+	n.hasSentRequest = true
 
 	// Send requests to other nodes
 	var replies int
 	for _, peer := range n.peers {
 		if peer != fmt.Sprintf("localhost:%d", n.nodeID) {
+			fmt.Printf("Asking %s for reply with request time: %s", peer, unixNanoToDateString(req.GetTimestamp()))
+			fmt.Println()
 			client, err := n.getClient(peer)
 			if err != nil {
 				log.Fatal(err)
@@ -57,7 +60,13 @@ func (n *Node) RequestCS(ctx context.Context, req *leader.Request) (*leader.Resp
 			}
 
 			if resp.GetSuccess() {
+				fmt.Printf("Got a successful reply from %s", peer)
+				fmt.Println()
 				replies++
+			} else {
+				fmt.Printf("Did not get a successful reply from %s", peer)
+				fmt.Println()
+
 			}
 		}
 	}
@@ -69,22 +78,40 @@ func (n *Node) RequestCS(ctx context.Context, req *leader.Request) (*leader.Resp
 
 		// Simulate accessing the Critical Section
 		n.enterCS()
-
+		n.timestamp = time.Now().UnixNano()
 		n.criticalSec = false
+
+	}
+	
+	for _, req := range n.requests {
+		client, err := n.getClient(fmt.Sprintf("localhost:%d", req.NodeId))
+		if err != nil {
+			return nil, err
+		}
+		client.RequestCS(context.Background(), &req)
+		
+		bestTime 
+		
+	}
+	for k := range n.requests {
+		delete(n.requests, k)
 	}
 
 	return &leader.Response{Success: true}, nil
 }
 
 func (n *Node) ReplyCS(ctx context.Context, req *leader.Request) (*leader.Response, error) {
-	n.grantMutex.Lock()
-	defer n.grantMutex.Unlock()
 
 	// Handle reply logic based on Ricart-Agrawala
-	if req.GetTimestamp() >= n.timestamp {
-		n.requests[req.GetNodeId()] = *req
+	fmt.Printf("Comparing %d's req timestamp %s to own timestamp %s", req.NodeId, unixNanoToDateString(req.GetTimestamp()), unixNanoToDateString(n.timestamp))
+	fmt.Println()
+	if req.GetTimestamp() <= n.timestamp || !n.hasSentRequest {
+		fmt.Println("Success")
 		return &leader.Response{Success: true}, nil
 	}
+	n.requests[req.GetNodeId()] = *req
+
+	fmt.Println("Failure")
 	return &leader.Response{Success: false}, nil
 }
 
@@ -99,7 +126,7 @@ func (n *Node) getClient(server string) (leader.LeaderServiceClient, error) {
 func (n *Node) enterCS() {
 	// Simulate the critical section
 	fmt.Printf("Node %d is accessing the Critical Section\n", n.nodeID)
-	time.Sleep(2 * time.Second) // Simulate work in CS
+	time.Sleep(10 * time.Second) // Simulate work in CS
 	fmt.Printf("Node %d is leaving the Critical Section\n", n.nodeID)
 }
 
@@ -154,4 +181,11 @@ func main() {
 	}
 
 	select {}
+}
+
+func unixNanoToDateString(unixNano int64) string {
+	// Convert UnixNano to a time.Time object
+	t := time.Unix(0, unixNano)
+	// Format the time as a string
+	return t.Format("2006-01-02 15:04:05.999999999")
 }
