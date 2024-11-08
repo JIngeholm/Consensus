@@ -101,7 +101,12 @@ func (n *Node) RequestCS(ctx context.Context, req *leader.Request) (*leader.Resp
 
 func (n *Node) ReplyCS(ctx context.Context, req *leader.Request) (*leader.Response, error) {
 
-	fmt.Printf("Comparing %d's req timestamp %s to own timestamp %s", req.NodeId, unixNanoToDateString(req.GetTimestamp()), unixNanoToDateString(n.timestamp))
+	if(!n.hasSentRequest){
+		fmt.Printf("Comparing %d's req timestamp %s to own timestamp ' '", req.NodeId, unixNanoToDateString(req.GetTimestamp()))
+	}else{
+		fmt.Printf("Comparing %d's req timestamp %s to own timestamp %s", req.NodeId, unixNanoToDateString(req.GetTimestamp()), unixNanoToDateString(n.timestamp))
+	}
+
 	fmt.Println()
 	if req.GetTimestamp() <= n.timestamp || !n.hasSentRequest {
 		fmt.Println("Success")
